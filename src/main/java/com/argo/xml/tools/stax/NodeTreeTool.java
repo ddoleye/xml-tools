@@ -40,19 +40,22 @@ public class NodeTreeTool extends StAXBase implements XMLTool {
 	@Override
 	public void run(InputStream input, OutputStream output) throws IOException {
 		try {
-			NodeCount root = collect(input);
+			Object[] stats = new Object[1];
+			stats[0] = Integer.valueOf(0);
+			NodeCount root = collect(input, stats);
 
 			if (root == null) {
 				// error?
 			} else {
-				print(root, output);
+				print(root, output, (Integer) stats[0]);
 			}
 		} catch (XMLStreamException e) {
 			throw new IOException(e);
 		}
 	}
 
-	private NodeCount collect(InputStream input) throws XMLStreamException {
+	private NodeCount collect(InputStream input, Object[] stats)
+			throws XMLStreamException {
 		NodeCount root = null;
 		NodeCount current = null;
 
@@ -77,6 +80,10 @@ public class NodeTreeTool extends StAXBase implements XMLTool {
 						// 자식을 스택에도 추가
 						stack.push(current = child);
 					}
+
+					if (stack.size() > (Integer) stats[0])
+						stats[0] = Integer.valueOf(stack.size());
+
 				} else if (event.isEndElement()) {
 					// 종료태그일 경우는 스택에서 노드 제거
 					if (buf.length() > 0) {
@@ -96,10 +103,11 @@ public class NodeTreeTool extends StAXBase implements XMLTool {
 		return root;
 	}
 
-	private void print(NodeCount root, OutputStream output) throws IOException {
+	private void print(NodeCount root, OutputStream output, int maxdepth)
+			throws IOException {
 		OutputStreamWriter writer = new OutputStreamWriter(output);
 		try {
-			print(root, 0, writer);
+			print(root, 0, writer, maxdepth);
 		} finally {
 			writer.flush();
 		}
@@ -107,14 +115,20 @@ public class NodeTreeTool extends StAXBase implements XMLTool {
 
 	private void tab(int depth, Writer out) throws IOException {
 		for (int ii = 0; ii < depth; ii++) {
-			out.write("  ");
+			out.write("\t");
 		}
 	}
 
-	private void print(NodeCount node, int depth, Writer out)
+	private void print(NodeCount node, int depth, Writer out, int maxdepth)
 			throws IOException {
 		tab(depth, out);
 		out.write(node.getName());
+
+		if (showCount || showValue) {
+			if (depth < maxdepth) {
+				tab(maxdepth - depth, out);
+			}
+		}
 		if (showCount) {
 			out.write("\t");
 			out.write(String.valueOf(node.getCount()));
@@ -132,7 +146,7 @@ public class NodeTreeTool extends StAXBase implements XMLTool {
 		}
 		out.write("\n");
 		for (NodeCount child : node.getChildren()) {
-			print(child, depth + 1, out);
+			print(child, depth + 1, out, maxdepth);
 		}
 	}
 }
